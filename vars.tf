@@ -51,10 +51,10 @@ variable "request_ip_block" {
   default     = true
 }
 
-variable "ip_block_size" {
-  description = "The size of the IP block to reserve. For example, 8 for /29, 16 for /28, etc."
+variable "lb_block_size" {
+  description = "The min size of load balancer IPs to reserve."
   type        = number
-  default     = 16
+  default     = 3
 }
 
 variable "reserved_ip_addresses" {
