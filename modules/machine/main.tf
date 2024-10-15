@@ -15,7 +15,7 @@ locals {
   nodes_meta = { for item in local.nodes_meta_flat : item.key => item.value }
 
   indexed_nodes_meta = {
-    for k, v in local.nodes_meta : 
+    for k, v in local.nodes_meta :
     k => {
       index = index(keys(local.nodes_meta), k) + 1,
       value = v
@@ -33,13 +33,13 @@ locals {
     "25" = "255.255.255.128"
   }
 
-  subnet_mask = local.cidr_to_netmask[element(split("/", var.reserved_ip_cidr), 1)]  
+  subnet_mask         = local.cidr_to_netmask[element(split("/", var.reserved_ip_cidr), 1)]
   sliced_ip_addresses = length(var.reserved_ip_addresses) > 1 ? slice(var.reserved_ip_addresses, 1, length(var.reserved_ip_addresses)) : []
 }
 
 resource "equinix_metal_device" "machine" {
   for_each = local.indexed_nodes_meta
-  
+
   hostname                = format("%s-%02d", var.hostname, each.value.index)
   plan                    = each.value.value["plan"]
   hardware_reservation_id = each.value.value["hardware_reservation_id"]
@@ -56,16 +56,16 @@ resource "equinix_metal_device" "machine" {
   }
 
   ip_address {
-    type            = "public_ipv4"
-    cidr            = 31
+    type = "public_ipv4"
+    cidr = 31
   }
 
-    connection {
-    type     = "ssh"
-    host     = self.access_public_ipv4
-    user     = "root" 
+  connection {
+    type        = "ssh"
+    host        = self.access_public_ipv4
+    user        = "root"
     private_key = file("ssh_keys/${var.cluster_name}.pem")
-    timeout  = "2m"
+    timeout     = "2m"
   }
 
   provisioner "remote-exec" {
@@ -77,21 +77,23 @@ resource "equinix_metal_device" "machine" {
       "echo '    address ${var.ip_addresses[each.key]}' >> /etc/network/interfaces",
       "echo '    netmask ${local.subnet_mask}' >> /etc/network/interfaces",
       "echo '    vlan-raw-device bond0' >> /etc/network/interfaces",
-      "systemctl restart networking"
+      "systemctl restart networking",
+      "useradd --home /var/lib/k0s --shell /sbin/nologin --system --no-create-home kube-apiserver",
     ]
   }
 }
 
 # Change network mode to hybrid for the edge instance
 resource "equinix_metal_device_network_type" "machine" {
-  for_each   = local.indexed_nodes_meta
-  device_id  = equinix_metal_device.machine[each.key].id
-  type       = "hybrid-bonded"
+  for_each  = local.indexed_nodes_meta
+  device_id = equinix_metal_device.machine[each.key].id
+  type      = "hybrid-bonded"
 }
 
 resource "equinix_metal_port_vlan_attachment" "machine" {
-  for_each   = local.indexed_nodes_meta
+  for_each  = local.indexed_nodes_meta
   device_id = equinix_metal_device.machine[each.key].id
   port_name = "bond0"
   vlan_vnid = var.vlan
 }
+
